@@ -33,6 +33,7 @@
             position: absolute;
             top: 0;
             right: 50px;
+            display: none;
         }
         
         input {
@@ -128,52 +129,12 @@
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
 
-            function connectSocket(e) {
+            function enableDrawing() {
+                els.drawingTools.style.display = "block";
+            }
 
-                if (socket) {
-                    els.chat.value += "\nYou are already connected. Please refresh the page to reconnect under a different username.";
-                    return;
-                }
-
-                socket = io.connect();
-
-                // Canvas syncing
-                socket.on('sendCanvas', sendCanvas);
-                socket.on('drawToClient', setCanvas);
-                socket.on('newGame', function () {
-                    clearCanvas();
-                    els.guessCount.innerHTML = "0";
-                });
-
-                //listener for connect event
-                socket.on('connect', function () {
-
-                    // Clear chat
-                    clearChat();
-
-                    //console.log('connecting');
-                    els.chat.value += "\n\nConnecting...";
-
-                    var user = els.username.value;
-                    if (!user) {
-                        user = 'unknown';
-                    }
-                    socket.emit('join', {
-                        name: user
-                    });
-                });
-
-                //listener for msg event
-                socket.on('msg', function (data) {
-                    els.chat.value += "\n" + data.name + ": " + data.msg;
-                    //console.log(data);
-                });
-
-                // listener for guesses
-                socket.on('guess', function (data) {
-                    els.guessCount.innerHTML = data;
-                });
-
+            function disableDrawing() {
+                els.drawingTools.style.display = "none";
             }
 
             function sendMessage(e) {
@@ -189,6 +150,58 @@
 
             }
 
+            function connectSocket(e) {
+
+                var user = els.username.value;
+                if (!user || user == "") {
+                    els.chat.value += "\nYou must create a username.";
+                    return;
+                }
+                if (socket) {
+                    els.chat.value += "\nYou are already connected. Please refresh the page to reconnect under a different username.";
+                    return;
+                }
+
+                socket = io.connect();
+
+                // Canvas syncing
+                socket.on('sendCanvas', sendCanvas);
+                socket.on('drawToClient', setCanvas);
+                socket.on('newGame', function () {
+                    clearCanvas();
+                    els.guessCount.innerHTML = "0";
+                });
+
+                // Drawing
+                socket.on('enableDrawing', enableDrawing);
+                socket.on('disableDrawing', disableDrawing);
+
+                // Listener for connect event
+                socket.on('connect', function () {
+
+                    // Clear chat
+                    clearChat();
+
+                    els.chat.value += "\n\nConnecting...";
+
+                    socket.emit('join', {
+                        name: user
+                    });
+                });
+
+                // Listener for msg event
+                socket.on('msg', function (data) {
+                    els.chat.value += "\n" + data.name + ": " + data.msg;
+                    //console.log(data);
+                });
+
+                // Listener for guesses
+                socket.on('guess', function (data) {
+                    els.guessCount.innerHTML = data;
+                });
+
+            }
+
             function init() {
                 // Buttons
                 els["connect"] = document.querySelector("#connect");
@@ -200,7 +213,7 @@
                 els.send.addEventListener('click', sendMessage);
                 els.clear.addEventListener('click', clearCanvas);
 
-                //Text fields
+                // Text fields
                 els["username"] = document.querySelector("#username");
                 els["message"] = document.querySelector("#message");
                 els["chat"] = document.querySelector("#chat");
@@ -210,8 +223,9 @@
                 // Canvas
                 canvas = document.querySelector("#canvas");
                 ctx = canvas.getContext("2d");
+                els["drawingTools"] = document.querySelector(".drawing-tools");
 
-                //Clear chat
+                // Clear chat
                 clearChat();
             }
 

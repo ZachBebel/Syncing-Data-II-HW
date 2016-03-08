@@ -119,6 +119,13 @@
 
                     // Tell clients to clear their canvas and guess count
                     io.sockets.in(roomName).emit('newGame');
+
+                    // Enable artist drawing tools
+                    socket.emit('enableDrawing');
+
+                    // Disable other users' drawing tools
+                    socket.broadcast.to(roomName).emit('disableDrawing');
+
                 } else {
 
                     // Don't let users start a new game in the middle of a current one
