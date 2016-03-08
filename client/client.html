@@ -108,7 +108,7 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height); //draw to screen
 
                 var data = {
-                    answer: els.answer.value,
+                    answer: els.answer.value.trim(),
                     canvas: canvas.toDataURL() //get pixel data from canvas
                 };
                 socket.emit("drawToServer", data);
@@ -142,7 +142,7 @@
                 socket.on('drawToClient', setCanvas);
                 socket.on('newGame', function () {
                     clearCanvas();
-                    els.guessCount.value = "0";
+                    els.guessCount.innerHTML = "0";
                 });
 
                 //listener for connect event
@@ -174,7 +174,7 @@
 
                 // listener for guesses
                 socket.on('guess', function (data) {
-                    els.guessCount.value = data;
+                    els.guessCount.innerHTML = data;
                 });
 
             }
