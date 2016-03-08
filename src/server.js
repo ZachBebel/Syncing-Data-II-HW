@@ -21,9 +21,10 @@
         serverName = '[[Server]]',
 
         // Game Vars
+        artist = "",
+        canvas,
         answer = "",
         guessCount = 0,
-        artist = "",
         newGame = false,
         gameStarted = false,
 
@@ -73,6 +74,20 @@
 
             // Add user to object
             users[data.name] = roomName;
+
+            // Sync client into existing game if there is one
+            if (gameStarted) {
+                socket.emit('drawToClient', canvas);
+                socket.emit('msg', {
+                    name: serverName,
+                    msg: 'You have joined into the current game'
+                });
+            } else if (newGame) {
+                socket.emit('msg', {
+                    name: serverName,
+                    msg: artist + ' is currently drawing'
+                });
+            }
         });
     };
 
@@ -192,11 +207,12 @@
         socket.on('drawToServer', function (data) {
 
             answer = data.answer;
+            canvas = data.canvas;
 
             //grab ALL sockets in the room and emit the newly updated square to them. 
             //We are sending an "updatedMovement" message back to the user of our updated square
             //Remember io.sockets.in sends a message to EVERYONE in the room vs broadcast which sends to everyone EXCEPT this user. 
-            io.sockets.in(roomName).emit('drawToClient', data.canvas);
+            io.sockets.in(roomName).emit('drawToClient', canvas);
         });
 
     };
@@ -216,6 +232,12 @@
 
             // Remove user from object
             delete users[socket.name];
+
+            // Check for no users
+            if (Object.keys(users).length < 1) {
+                newGame = false;
+                gameStarted = false;
+            }
         });
 
     };
