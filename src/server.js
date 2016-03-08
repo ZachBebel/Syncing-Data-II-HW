@@ -23,6 +23,9 @@
         // Game Vars
         answer = "",
         guessCount = 0,
+        artist = "",
+        newGame = false,
+        gameStarted = false,
 
         // Functions
         onJoined,
@@ -83,52 +86,117 @@
                 time;
 
 
-            if (message === "/new game") {
+            if (message === "/new game") { // Start a new game with the command user as the artist
 
-                // Dice roll
-                io.sockets.in(roomName).emit('msg', {
-                    name: username,
-                    msg: message
-                });
-                message = username + " has rolled a " + Math.floor((Math.random() * 6) + 1) + " on a six-sided die";
+                if (!newGame) {
 
-            } else if () {
+                    // Reset game stats
+                    artist = username;
+                    answer = "";
+                    guessCount = 0;
+                    newGame = true;
 
-                // Action commands
-                message = socket.name + message.split(command)[1];
+                    // Send message to everyone
+                    io.sockets.in(roomName).emit('msg', {
+                        name: username,
+                        msg: message
+                    });
 
-            } else if (message.indexOf(command) > -1) {
+                    // Tell clients to clear their canvas and guess count
+                    io.sockets.in(roomName).emit('newGame');
+                } else {
 
-                // Send to yourself
-                socket.emit('msg', {
-                    name: username,
-                    msg: message
-                });
+                    // Don't let users start a new game in the middle of a current one
+                    socket.emit('msg', {
+                        name: serverName,
+                        msg: "A game is already in progress"
+                    });
+                }
 
-                // Server time
-                time = new Date();
-                message = "Current time: " + time.getHours() + ":" + time.getMinutes() + ":" + time.getSeconds();
-                socket.emit('msg', {
-                    name: serverName,
-                    msg: message
-                });
+            } else if (message === "/start") { // Submit record art & answer and sync with clients
 
-                return;
+                // Only start game if in a new game
+                if (newGame) {
+                    if (username === artist) {
+
+                        // Send message to everyone
+                        io.sockets.in(roomName).emit('msg', {
+                            name: username,
+                            msg: message
+                        });
+
+                        // Notify the artist to send canvas data to server
+                        socket.emit('sendCanvas');
+
+                        gameStarted = true;
+                    } else {
+
+                        // Non-artists can't submit canvas data
+                        socket.emit('msg', {
+                            name: serverName,
+                            msg: "You are not the artist"
+                        });
+                    }
+                } else {
+                    socket.emit('msg', {
+                        name: serverName,
+                        msg: "A new game is required to start"
+                    });
+                }
+
+
+            } else if (message.indexOf(command) > -1) { // Check user guesses against answer
+
+                if (gameStarted) {
+                    // Send message to everyone
+                    io.sockets.in(roomName).emit('msg', {
+                        name: username,
+                        msg: message
+                    });
+
+                    // Get answer
+                    message = message.split(command)[1].trim();
+                    guessCount += 1;
+                    io.sockets.in(roomName).emit('guess', guessCount);
+
+                    // Check guess against answer
+                    if (message === answer) {
+
+                        newGame = false;
+                        gameStarted = false;
+
+                        // If correct, game over
+                        message = socket.name + " has guessed correctly! Well done!";
+
+                    } else {
+
+                        // If incorrect
+                        message = "Incorrect guess. Try again!";
+                    }
+
+                    // Send message to everyone
+                    io.sockets.in(roomName).emit('msg', {
+                        name: username,
+                        msg: message
+                    });
+                } else {
+                    socket.emit('msg', {
+                        name: serverName,
+                        msg: "The game has not started yet"
+                    });
+                }
             }
 
-            // Send to everyone
-            io.sockets.in(roomName).emit('msg', {
-                name: username,
-                msg: message
-            });
         });
 
         socket.on('drawToServer', function (data) {
 
+            answer = data.answer;
+
             //grab ALL sockets in the room and emit the newly updated square to them. 
             //We are sending an "updatedMovement" message back to the user of our updated square
             //Remember io.sockets.in sends a message to EVERYONE in the room vs broadcast which sends to everyone EXCEPT this user. 
-            io.sockets.in(roomName).emit('drawToClient', data);
+            io.sockets.in(roomName).emit('drawToClient', data.canvas);
         });
 
     };

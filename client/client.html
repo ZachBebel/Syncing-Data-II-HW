@@ -57,7 +57,7 @@
     <textarea id="chat" rows="30" cols="70" readonly> </textarea>
 
     <div class="canvas-holder">
-        <h2>Guesses: <span id=guess-count>0</span></h2>
+        <h2>Guesses: <span id="guess-count">0</span></h2>
 
         <div class="drawing-tools">
             <label for="answer">Answer:</label>
@@ -79,18 +79,6 @@
             var els = {};
             var canvas;
             var ctx;
-            var sendBufferCanvas;
-            var sendBufferCtx;
-
-            // http://stackoverflow.com/questions/1484506/random-color-generator-in-javascript
-            function getRandomColor() {
-                var letters = '0123456789ABCDEF'.split('');
-                var color = '#';
-                for (var i = 0; i < 6; i++) {
-                    color += letters[Math.floor(Math.random() * 16)];
-                }
-                return color;
-            }
 
             function clearChat() {
                 //Clear fields
@@ -102,28 +90,42 @@
                     "\n/guess ... - Submit a guess (Global)";
             }
 
-            function setup() {
-                var x = Math.floor(Math.random() * 450);
-                var y = Math.floor(Math.random() * 450);
+            // http://stackoverflow.com/questions/1484506/random-color-generator-in-javascript
+            function getRandomColor() {
+                var letters = '0123456789ABCDEF'.split('');
+                var color = '#';
+                for (var i = 0; i < 6; i++) {
+                    color += letters[Math.floor(Math.random() * 16)];
+                }
+                return color;
+            }
+
+            function sendCanvas() {
+
+                // Send rect for now
                 var color = getRandomColor();
-
-                sendBufferCanvas = document.createElement("canvas");
-                sendBufferCanvas.height = 50;
-                sendBufferCanvas.width = 50;
-                sendBufferCtx = sendBufferCanvas.getContext("2d");
-
                 ctx.fillStyle = color;
-                ctx.fillRect(x, y, 50, 50); //draw to screen
-                sendBufferCtx.fillStyle = color;
-                sendBufferCtx.fillRect(0, 0, 50, 50); //draw to hidden buffer
+                ctx.fillRect(0, 0, canvas.width, canvas.height); //draw to screen
+
                 var data = {
-                    x: x,
-                    y: y,
-                    height: 50,
-                    width: 50,
-                    imgData: sendBufferCanvas.toDataURL() //get pixel data from canvas
+                    answer: els.answer.value,
+                    canvas: canvas.toDataURL() //get pixel data from canvas
                 };
                 socket.emit("drawToServer", data);
+            }
+
+            function setCanvas(data) {
+
+                var image = new Image();
+                image.onload = function () {
+                    ctx.globalCompositeOperation = "source-over"; //this is default for canvas
+                    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                };
+                image.src = data;
+            }
+
+            function clearCanvas() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
 
             function connectSocket(e) {
@@ -136,13 +138,18 @@
                 socket = io.connect();
 
                 // Canvas syncing
-                socket.on('drawToClient', handleMessage);
+                socket.on('sendCanvas', sendCanvas);
+                socket.on('drawToClient', setCanvas);
+                socket.on('newGame', function () {
+                    clearCanvas();
+                    els.guessCount.value = "0";
+                });
 
                 //listener for connect event
                 socket.on('connect', function () {
 
-                    // TEMPORARY ****************************************
-                    setup();
+                    // TEMPORARY
+                    //sendCanvas();
 
                     // Clear chat
                     clearChat();
@@ -165,6 +172,11 @@
                     //console.log(data);
                 });
 
+                // listener for guesses
+                socket.on('guess', function (data) {
+                    els.guessCount.value = data;
+                });
+
             }
 
             function sendMessage(e) {
@@ -180,30 +192,23 @@
 
             }
 
-            function handleMessage(data) {
-                var image = new Image();
-                image.onload = function () {
-                    ctx.save();
-                    ctx.globalCompositeOperation = "source-over"; //this is default for canvas
-                    ctx.drawImage(image, data.x, data.y, data.width, data.height);
-                    ctx.restore();
-                };
-                image.src = data.imgData;
-            }
-
             function init() {
                 // Buttons
                 els["connect"] = document.querySelector("#connect");
                 els["send"] = document.querySelector("#send");
+                els["clear"] = document.querySelector("#clear");
 
                 // Click events
                 els.connect.addEventListener('click', connectSocket);
                 els.send.addEventListener('click', sendMessage);
+                els.clear.addEventListener('click', clearCanvas);
 
                 //Text fields
                 els["username"] = document.querySelector("#username");
                 els["message"] = document.querySelector("#message");
                 els["chat"] = document.querySelector("#chat");
+                els["answer"] = document.querySelector("#answer");
+                els["guessCount"] = document.querySelector("#guess-count");
 
                 // Canvas
                 canvas = document.querySelector("#canvas");
