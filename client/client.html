@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- import the websocket client library. You can code websockets from scratch
+         but we will just import a library. In this case we are using socket.io which is 
+         one of the most popular and feature rich websocket libraries.
+         
+         You can point the src for the script to any host online, but
+         by default the socket.io nodejs library will host the client library
+         online at your node.js address under /socket.io/socket.io.js 
+         You can disable that on the server if desired
+    -->
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+    <meta content="utf-8" http-equiv="encoding">
+    <style>
+        textarea {
+            display: block;
+            background-color: #EEEEEE;
+        }
+        
+        .canvas-holder {
+            position: absolute;
+            top: 0;
+            left: 700px;
+        }
+        
+        h2 {
+            margin: 20px 0;
+        }
+        
+        .drawing-tools {
+            position: absolute;
+            top: 0;
+            right: 50px;
+        }
+        
+        input {
+            margin: 3px 0;
+        }
+        
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <label for="user">Username:</label>
+    <input id="username" name="user" type="text" />
+    <input id="connect" type='button' value='Connect' />
+    <br>
+    <label for="message">Message:</label>
+    <input id="message" name="message" type="text" />
+    <input id="send" type="button" value="Send" />
+
+    <textarea id="chat" rows="30" cols="70" readonly> </textarea>
+
+    <div class="canvas-holder">
+        <h2>Guesses: <span id=guess-count>0</span></h2>
+
+        <div class="drawing-tools">
+            <label for="answer">Answer:</label>
+            <input id="answer" name="answer" type="text" />
+            <br>
+            <input id="clear" type="button" value="Clear Canvas" />
+        </div>
+        <canvas id="canvas" height="500" width="500">Please use an HTML 5 browser</canvas>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        (function () {
+
+            "use strict";
+
+            // Globals
+            var socket;
+            var els = {};
+            var canvas;
+            var ctx;
+            var sendBufferCanvas;
+            var sendBufferCtx;
+
+            // http://stackoverflow.com/questions/1484506/random-color-generator-in-javascript
+            function getRandomColor() {
+                var letters = '0123456789ABCDEF'.split('');
+                var color = '#';
+                for (var i = 0; i < 6; i++) {
+                    color += letters[Math.floor(Math.random() * 16)];
+                }
+                return color;
+            }
+
+            function clearChat() {
+                //Clear fields
+                els.message.value = "";
+                els.chat.value = "Please type in a username and connect to chat\n" +
+                    "\nUser commands are:" +
+                    "\n/new game  - Start a new game, with you as the artist (Global)" +
+                    "\n/start     - Submit your art & answer to begin guessing (Global)" +
+                    "\n/guess ... - Submit a guess (Global)";
+            }
+
+            function setup() {
+                var x = Math.floor(Math.random() * 450);
+                var y = Math.floor(Math.random() * 450);
+                var color = getRandomColor();
+
+                sendBufferCanvas = document.createElement("canvas");
+                sendBufferCanvas.height = 50;
+                sendBufferCanvas.width = 50;
+                sendBufferCtx = sendBufferCanvas.getContext("2d");
+
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, 50, 50); //draw to screen
+                sendBufferCtx.fillStyle = color;
+                sendBufferCtx.fillRect(0, 0, 50, 50); //draw to hidden buffer
+                var data = {
+                    x: x,
+                    y: y,
+                    height: 50,
+                    width: 50,
+                    imgData: sendBufferCanvas.toDataURL() //get pixel data from canvas
+                };
+                socket.emit("drawToServer", data);
+            }
+
+            function connectSocket(e) {
+
+                if (socket) {
+                    els.chat.value += "\nYou are already connected. Please refresh the page to reconnect under a different username.";
+                    return;
+                }
+
+                socket = io.connect();
+
+                // Canvas syncing
+                socket.on('drawToClient', handleMessage);
+
+                //listener for connect event
+                socket.on('connect', function () {
+
+                    // TEMPORARY ****************************************
+                    setup();
+
+                    // Clear chat
+                    clearChat();
+
+                    //console.log('connecting');
+                    els.chat.value += "\n\nConnecting...";
+
+                    var user = els.username.value;
+                    if (!user) {
+                        user = 'unknown';
+                    }
+                    socket.emit('join', {
+                        name: user
+                    });
+                });
+
+                //listener for msg event
+                socket.on('msg', function (data) {
+                    els.chat.value += "\n" + data.name + ": " + data.msg;
+                    //console.log(data);
+                });
+
+            }
+
+            function sendMessage(e) {
+
+                if (socket) {
+                    //Send messages
+                    socket.emit('msgToServer', {
+                        msg: els.message.value
+                    });
+                } else {
+                    els.chat.value += "\nPlease connect first";
+                }
+
+            }
+
+            function handleMessage(data) {
+                var image = new Image();
+                image.onload = function () {
+                    ctx.save();
+                    ctx.globalCompositeOperation = "source-over"; //this is default for canvas
+                    ctx.drawImage(image, data.x, data.y, data.width, data.height);
+                    ctx.restore();
+                };
+                image.src = data.imgData;
+            }
+
+            function init() {
+                // Buttons
+                els["connect"] = document.querySelector("#connect");
+                els["send"] = document.querySelector("#send");
+
+                // Click events
+                els.connect.addEventListener('click', connectSocket);
+                els.send.addEventListener('click', sendMessage);
+
+                //Text fields
+                els["username"] = document.querySelector("#username");
+                els["message"] = document.querySelector("#message");
+                els["chat"] = document.querySelector("#chat");
+
+                // Canvas
+                canvas = document.querySelector("#canvas");
+                ctx = canvas.getContext("2d");
+
+                //Clear chat
+                clearChat();
+            }
+
+            window.onload = init;
+
+        }());
+    </script>
+</body>
+
+</html>

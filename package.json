@@ -1,0 +1,19 @@
+{
+    "name": "Syncing-Data-II-HW",
+    "version": "1.0.0",
+    "description": "Syncing canvas data between two users",
+    "main": "./src/server.js",
+    "scripts": {
+        "start": "node ./src/server.js",
+        "pretest": "jshint ./src",
+        "test": "echo \"Tests complete\""
+    },
+    "author": "Zach Bebel",
+    "license": "ISC",
+    "dependencies": {
+        "socket.io": "^1.4.5"
+    },
+    "devDependencies": {
+        "jshint": "^2.9.1"
+    }
+}
